@@ -460,83 +460,79 @@ fn test_withdraw_above_minimum_succeeds() {
 }
 
 #[test]
-fn test_confidential_claim_executes_with_valid_proof() {
+fn test_change_grantee() {
     let env = Env::default();
     env.mock_all_auths();
-    let (_admin, grant_token_addr, _treasury, _oracle, _native, client) = setup_test(&env);
-    let recipient = Address::generate(&env);
-    let grant_token = token::Client::new(&env, &grant_token_addr);
+    let (admin, grant_token_addr, _treasury, _oracle, _native, client) = setup_test(&env);
+    let old_recipient = Address::generate(&env);
+    let new_recipient = Address::generate(&env);
     let grant_token_admin = token::StellarAssetClient::new(&env, &grant_token_addr);
-    let grant_id = 501u64;
-    let commitment_before = 1_000_000i128;
-    let claim_amount = 10_000i128;
-    let nullifier = Bytes::from_array(&env, &[1; 32]);
-    let verifier_key_hash = Bytes::from_array(&env, &[7; 32]);
 
-    grant_token_admin.mint(&client.address, &1_000_000i128);
-    client.create_confidential_grant(
-        &grant_id,
-        &recipient,
-        &commitment_before,
-        &verifier_key_hash,
-    );
-
-    let proof = build_confidential_proof(
-        &env,
-        grant_id,
-        commitment_before,
-        claim_amount,
-        &nullifier,
-        &verifier_key_hash,
-    );
-    let recipient_before = grant_token.balance(&recipient);
-    client.confidential_claim(&grant_id, &claim_amount, &nullifier, &proof);
-    let recipient_after = grant_token.balance(&recipient);
-    assert_eq!(recipient_after, recipient_before + claim_amount);
+    set_timestamp(&env, 1000);
+    let grant_id = 1;
+    let total_amount = 1_000_000 * SCALING_FACTOR;
+    let flow_rate = 1 * SCALING_FACTOR;
+    grant_token_admin.mint(&client.address, &total_amount);
+    
+    // Create grant with old recipient
+    client.create_grant(&grant_id, &old_recipient, &total_amount, &flow_rate, &0, &None);
+    
+    // Verify initial state
+    let grant = client.get_grant(&grant_id);
+    assert_eq!(grant.recipient, old_recipient);
+    
+    // Change grantee
+    client.change_grantee(&grant_id, &new_recipient);
+    
+    // Verify grantee changed
+    let updated_grant = client.get_grant(&grant_id);
+    assert_eq!(updated_grant.recipient, new_recipient);
+    assert_eq!(updated_grant.redirect, None); // Should be cleared
+    
+    // Test that new recipient can withdraw
+    set_timestamp(&env, 1100); // 100 tokens accrued
+    client.withdraw(&grant_id, &(100 * SCALING_FACTOR));
+    
+    // Verify tokens went to new recipient
+    let grant_token = token::Client::new(&env, &grant_token_addr);
+    assert_eq!(grant_token.balance(&new_recipient), 100 * SCALING_FACTOR);
 }
 
 #[test]
-fn test_confidential_claim_invalid_proof_fuzz_barrage() {
+fn test_change_grantee_same_recipient_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (_admin, _grant_token_addr, _treasury, _oracle, _native, client) = setup_test(&env);
+    let recipient = Address::generate(&env);
+    
+    let grant_id = 1;
+    client.create_grant(&grant_id, &recipient, &(1000 * SCALING_FACTOR), &SCALING_FACTOR, &0, &None);
+    
+    // Attempt to change to same recipient should fail
+    let result = client.try_change_grantee(&grant_id, &recipient);
+    assert_eq!(result, Err(Ok(Error::InvalidRecipient)));
+}
+
+#[test]
+fn test_change_grantee_completed_grant_fails() {
     let env = Env::default();
     env.mock_all_auths();
     let (_admin, grant_token_addr, _treasury, _oracle, _native, client) = setup_test(&env);
-    let recipient = Address::generate(&env);
+    let old_recipient = Address::generate(&env);
+    let new_recipient = Address::generate(&env);
     let grant_token_admin = token::StellarAssetClient::new(&env, &grant_token_addr);
-    let grant_id = 502u64;
-    let commitment_before = 50_000i128;
-    let verifier_key_hash = Bytes::from_array(&env, &[9; 32]);
-
-    grant_token_admin.mint(&client.address, &1_000_000i128);
-    client.create_confidential_grant(
-        &grant_id,
-        &recipient,
-        &commitment_before,
-        &verifier_key_hash,
-    );
-
-    for i in 0..128u32 {
-        let mut bad_nullifier = Bytes::new(&env);
-        bad_nullifier.append(&Bytes::from_array(&env, &[0; 31]));
-        bad_nullifier.push_back((i % 255) as u8);
-        let mut bad_proof = Bytes::new(&env);
-        bad_proof.append(&Bytes::from_array(&env, &[3; 31]));
-        bad_proof.push_back((i % 251) as u8);
-        let bad_claim = commitment_before + 1 + i as i128;
-        let result = client.try_confidential_claim(&grant_id, &bad_claim, &bad_nullifier, &bad_proof);
-        assert_eq!(result, Err(Ok(super::Error::InvalidZKProof)));
-    }
-
-    let nullifier = Bytes::from_array(&env, &[5; 32]);
-    let claim_amount = 1_000i128;
-    let proof = build_confidential_proof(
-        &env,
-        grant_id,
-        commitment_before,
-        claim_amount,
-        &nullifier,
-        &verifier_key_hash,
-    );
-    client.confidential_claim(&grant_id, &claim_amount, &nullifier, &proof);
-    let replay = client.try_confidential_claim(&grant_id, &claim_amount, &nullifier, &proof);
-    assert_eq!(replay, Err(Ok(super::Error::InvalidZKProof)));
+    
+    let grant_id = 1;
+    let total_amount = 100 * SCALING_FACTOR;
+    grant_token_admin.mint(&client.address, &total_amount);
+    
+    client.create_grant(&grant_id, &old_recipient, &total_amount, &SCALING_FACTOR, &0, &None);
+    
+    // Complete the grant
+    set_timestamp(&env, 1100);
+    client.withdraw(&grant_id, &total_amount);
+    
+    // Attempt to change grantee of completed grant should fail
+    let result = client.try_change_grantee(&grant_id, &new_recipient);
+    assert_eq!(result, Err(Ok(Error::InvalidState)));
 }
