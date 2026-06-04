@@ -1,7 +1,7 @@
 {
-  "name": "grant-stream-api",
+  "name": "agritrust-contracts-api",
   "version": "1.0.0",
-  "description": "Grant Stream escrow API with legal-hold gating",
+  "description": "AgriTrust Protocol escrow API with legal-hold gating",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
