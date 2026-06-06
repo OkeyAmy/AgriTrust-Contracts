@@ -231,19 +231,22 @@ impl SecurityCouncil {
     /// Security Council member signs to veto an action
     /// Requires 3 of 5 signatures to permanently block the action
     pub fn sign_veto(env: Env, action_id: u64, signer: Address) -> Result<(), SecurityCouncilError> {
-        require_council_member(&env, &signer)?;
-
-        let mut action = read_pending_action(&env, action_id)?;
+        let action = read_pending_action(&env, action_id)?;
 
         if action.status != ActionStatus::Pending {
             return Err(SecurityCouncilError::ActionAlreadyVetoed);
         }
 
-        // Check if already signed
-        let mut signatures = get_veto_signatures(&env, action_id);
+        // Check if already signed before requiring auth
+        let signatures = get_veto_signatures(&env, action_id);
         if signatures.get(signer.clone()).unwrap_or(false) {
             return Err(SecurityCouncilError::AlreadySigned);
         }
+
+        require_council_member(&env, &signer)?;
+
+        let mut action = action;
+        let mut signatures = signatures;
 
         // Add signature
         signatures.set(signer.clone(), true);
