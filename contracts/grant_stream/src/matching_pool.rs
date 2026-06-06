@@ -178,8 +178,8 @@ fn calculate_quadratic_matching_component(
             .ok_or(MatchingError::MathOverflow)?;
     }
 
-    // Return sqrt(sum) - the final component
-    isqrt_fixed_point(sum)
+    // Return the sum of all project square roots as the matching component
+    Ok(sum)
 }
 
 /// SEP-12 identity verification check
@@ -519,8 +519,6 @@ impl MatchingPoolContract {
                     .checked_mul(pool.remaining_match_amount)
                     .ok_or(MatchingError::MathOverflow)?
                     .checked_div(match_component)
-                    .ok_or(MatchingError::MathOverflow)?
-                    .checked_div(FIXED_POINT_SCALE)
                     .ok_or(MatchingError::MathOverflow)?
             } else {
                 0
