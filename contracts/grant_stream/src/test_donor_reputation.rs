@@ -24,7 +24,9 @@ fn create_test_env() -> (Env, Address) {
 
 fn with_contract<F: FnOnce()>(env: &Env, f: F) {
     let contract_id = env.register_contract(None, crate::GrantStreamContract);
-    env.as_contract(&contract_id, f);
+    env.as_contract(&contract_id, || {
+        f()
+    });
 }
 
 fn initialize_reputation_system(env: &Env, admin: &Address) {
@@ -73,6 +75,7 @@ fn create_donor_with_projects(
 #[test]
 fn test_linear_influence_scaling_tiers() {
     let (env, admin) = create_test_env();
+    env.mock_all_auths();
     with_contract(&env, || {
         initialize_reputation_system(&env, &admin);
 
@@ -116,6 +119,7 @@ fn test_linear_influence_scaling_tiers() {
 #[test]
 fn test_minimum_funding_threshold_prevents_farming() {
     let (env, admin) = create_test_env();
+    env.mock_all_auths();
     with_contract(&env, || {
         initialize_reputation_system(&env, &admin);
 
@@ -159,6 +163,7 @@ fn test_minimum_funding_threshold_prevents_farming() {
 #[test]
 fn test_reputation_farming_resistance() {
     let (env, admin) = create_test_env();
+    env.mock_all_auths();
     with_contract(&env, || {
         initialize_reputation_system(&env, &admin);
 
@@ -203,6 +208,7 @@ fn test_reputation_farming_resistance() {
 #[test]
 fn test_partial_milestone_completion() {
     let (env, admin) = create_test_env();
+    env.mock_all_auths();
     with_contract(&env, || {
         initialize_reputation_system(&env, &admin);
 
@@ -241,6 +247,7 @@ fn test_partial_milestone_completion() {
 #[test]
 fn test_influence_math_fairness() {
     let (env, admin) = create_test_env();
+    env.mock_all_auths();
     with_contract(&env, || {
         initialize_reputation_system(&env, &admin);
 
@@ -280,6 +287,7 @@ fn test_influence_math_fairness() {
 #[test]
 fn test_reputation_update_history() {
     let (env, admin) = create_test_env();
+    env.mock_all_auths();
     with_contract(&env, || {
         initialize_reputation_system(&env, &admin);
 
@@ -328,6 +336,7 @@ fn test_reputation_update_history() {
 #[test]
 fn test_configuration_updates() {
     let (env, admin) = create_test_env();
+    env.mock_all_auths();
     with_contract(&env, || {
         initialize_reputation_system(&env, &admin);
 
@@ -391,6 +400,7 @@ fn test_configuration_updates() {
 #[test]
 fn test_edge_cases_and_error_handling() {
     let (env, admin) = create_test_env();
+    env.mock_all_auths();
     with_contract(&env, || {
         initialize_reputation_system(&env, &admin);
 
@@ -446,6 +456,7 @@ fn test_edge_cases_and_error_handling() {
 #[test]
 fn test_multiple_donors_independence() {
     let (env, admin) = create_test_env();
+    env.mock_all_auths();
     with_contract(&env, || {
         initialize_reputation_system(&env, &admin);
 
@@ -480,6 +491,7 @@ fn test_multiple_donors_independence() {
 #[test] 
 fn test_reputation_persistence_across_operations() {
     let (env, admin) = create_test_env();
+    env.mock_all_auths();
     with_contract(&env, || {
         initialize_reputation_system(&env, &admin);
 
