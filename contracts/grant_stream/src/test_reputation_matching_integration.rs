@@ -25,7 +25,8 @@ fn create_test_env() -> Env {
 
 fn setup_reputation_and_matching(env: &Env) -> (Address, Address) {
     let admin = Address::generate(env);
-    let token = env.register_stellar_asset_contract_v2(admin.clone());
+    let token_contract = env.register_stellar_asset_contract_v2(admin.clone());
+    let token = token_contract.address();
 
     // Initialize reputation system
     DonorReputationContract::initialize(env.clone(), admin.clone()).unwrap();
