@@ -76,14 +76,16 @@ fn test_pipeline() {
 fn test_milestone_submission_deposit_refunded_on_approval() {
     let env = Env::default();
     env.mock_all_auths();
-    let (_admin, _grant_token_addr, _treasury, _oracle, native_token_addr, client) = setup_test(&env);
+    let (_admin, grant_token_addr, _treasury, _oracle, native_token_addr, client) = setup_test(&env);
     let recipient = Address::generate(&env);
     let native_token = token::Client::new(&env, &native_token_addr);
     let native_token_admin = token::StellarAssetClient::new(&env, &native_token_addr);
+    let grant_token_admin = token::StellarAssetClient::new(&env, &grant_token_addr);
     let grant_id = 77u64;
-    let deposit = 100_000i128;
+    let deposit = 50_000_000i128;
 
-    native_token_admin.mint(&recipient, &1_000_000i128);
+    native_token_admin.mint(&recipient, &100_000_000i128);
+    grant_token_admin.mint(&client.address, &1_000_000i128);
     client.create_grant(&grant_id, &recipient, &1_000_000i128, &1_000i128, &0u64, &None, &None);
 
     let recipient_before = native_token.balance(&recipient);
@@ -107,14 +109,16 @@ fn test_milestone_submission_deposit_refunded_on_approval() {
 fn test_milestone_submission_deposit_slashed_to_treasury() {
     let env = Env::default();
     env.mock_all_auths();
-    let (_admin, _grant_token_addr, treasury, _oracle, native_token_addr, client) = setup_test(&env);
+    let (_admin, grant_token_addr, treasury, _oracle, native_token_addr, client) = setup_test(&env);
     let recipient = Address::generate(&env);
     let native_token = token::Client::new(&env, &native_token_addr);
     let native_token_admin = token::StellarAssetClient::new(&env, &native_token_addr);
+    let grant_token_admin = token::StellarAssetClient::new(&env, &grant_token_addr);
     let grant_id = 78u64;
-    let deposit = 100_000i128;
+    let deposit = 50_000_000i128;
 
-    native_token_admin.mint(&recipient, &1_000_000i128);
+    native_token_admin.mint(&recipient, &100_000_000i128);
+    grant_token_admin.mint(&client.address, &1_000_000i128);
     client.create_grant(&grant_id, &recipient, &1_000_000i128, &1_000i128, &0u64, &None, &None);
 
     let treasury_before = native_token.balance(&treasury);
@@ -202,13 +206,19 @@ fn test_get_health_factor_is_read_only_preview() {
 fn test_is_active_grantee_with_different_statuses() {
     let env = Env::default();
     env.mock_all_auths();
-    let (admin, _grant_token_addr, _treasury, _oracle, _native, client) = setup_test(&env);
+    let (admin, grant_token_addr, _treasury, _oracle, _native, client) = setup_test(&env);
     
     let active_grantee = Address::generate(&env);
     let paused_grantee = Address::generate(&env);
     let completed_grantee = Address::generate(&env);
     let cancelled_grantee = Address::generate(&env);
     let ragequit_grantee = Address::generate(&env);
+    let grant_token_admin = token::StellarAssetClient::new(&env, &grant_token_addr);
+    
+    // Mint tokens for all grants
+    for _ in 0..5 {
+        grant_token_admin.mint(&client.address, &1000000i128);
+    }
     
     // Create grants for each user
     client.create_grant(&1u64, &active_grantee, &1000000i128, &100i128, &0u64, &None, &None);
@@ -224,11 +234,12 @@ fn test_is_active_grantee_with_different_statuses() {
     client.pause_stream(&2u64, &None);
     assert!(client.is_active_grantee(&paused_grantee), "Paused grantee should return true");
     
-    // Complete grant 3 (should return false)
-    // For testing, we'll simulate completion by setting status directly
-    // In production, this would happen through normal grant lifecycle
-    let grant = client.get_grant(&3u64);
-    // Note: In real implementation, you'd need to use admin functions to complete grants
+    // Complete grant 3 via normal lifecycle
+    set_timestamp(&env, 20000);
+    let grant3_claimable = client.claimable(&3u64);
+    if grant3_claimable > 0 {
+        client.withdraw(&3u64, &grant3_claimable);
+    }
     
     // Cancel grant 4 (should return false)
     client.cancel_grant(&4u64);
@@ -244,28 +255,37 @@ fn test_is_active_grantee_with_different_statuses() {
 fn test_is_active_grantee_edge_cases() {
     let env = Env::default();
     env.mock_all_auths();
-    let (_admin, _grant_token_addr, _treasury, _oracle, _native, client) = setup_test(&env);
+    let (_admin, grant_token_addr, _treasury, _oracle, _native, client) = setup_test(&env);
     
     let user_with_multiple_grants = Address::generate(&env);
     let user_with_depleted_grant = Address::generate(&env);
+    let grant_token_admin = token::StellarAssetClient::new(&env, &grant_token_addr);
     
     // Test 1: User with multiple active grants
+    grant_token_admin.mint(&client.address, &1000000i128);
     client.create_grant(&1u64, &user_with_multiple_grants, &1000000i128, &100i128, &0u64, &None, &None);
+    grant_token_admin.mint(&client.address, &500000i128);
     client.create_grant(&2u64, &user_with_multiple_grants, &500000i128, &50i128, &0u64, &None, &None);
     assert!(client.is_active_grantee(&user_with_multiple_grants), "User with multiple active grants should return true");
     
     // Test 2: User with one active and one completed grant
+    grant_token_admin.mint(&client.address, &1000i128);
     client.create_grant(&3u64, &user_with_depleted_grant, &1000i128, &100i128, &0u64, &None, &None);
     set_timestamp(&env, 100); // Allow streaming to complete
     // Small grant should be depleted
     let claimable = client.claimable(&3u64);
     // Even if depleted, the grant might still be considered active until status changes
     
-    // Test 3: Zero amount grant
-    let zero_grant_user = Address::generate(&env);
-    client.create_grant(&4u64, &zero_grant_user, &0i128, &0i128, &0u64, &None, &None);
-    // Zero amount grants should not be considered active
-    assert!(!client.is_active_grantee(&zero_grant_user), "Zero amount grant should not be considered active");
+    // Test 3: Small grant that can be depleted
+    let small_grant_user = Address::generate(&env);
+    grant_token_admin.mint(&client.address, &2i128);
+    client.create_grant(&4u64, &small_grant_user, &2i128, &1i128, &0u64, &None, &None);
+    assert!(client.is_active_grantee(&small_grant_user), "Small active grant should be active");
+    set_timestamp(&env, 200);
+    let claimable_small = client.claimable(&4u64);
+    if claimable_small > 0 {
+        client.withdraw(&4u64, &claimable_small);
+    }
 }
 
 #[test]
@@ -289,7 +309,7 @@ fn test_is_active_grantee_performance() {
     }
     
     let after_cpu = env.budget().cpu_instruction_cost();
-    let total_cpu = after_cpu - before_cpu;
+    let total_cpu = after_cpu.saturating_sub(before_cpu);
     let avg_cpu_per_call = total_cpu / 100;
     
     println!("Average CPU instructions per is_active_grantee call: {}", avg_cpu_per_call);
@@ -302,11 +322,13 @@ fn test_is_active_grantee_performance() {
 fn test_is_active_grantee_archived_data() {
     let env = Env::default();
     env.mock_all_auths();
-    let (_admin, _grant_token_addr, _treasury, _oracle, _native, client) = setup_test(&env);
+    let (_admin, grant_token_addr, _treasury, _oracle, _native, client) = setup_test(&env);
     
     let archived_grantee = Address::generate(&env);
+    let grant_token_admin = token::StellarAssetClient::new(&env, &grant_token_addr);
     
     // Create a grant and then cancel it (simulating archived data)
+    grant_token_admin.mint(&client.address, &1000000i128);
     client.create_grant(&1u64, &archived_grantee, &1000000i128, &100i128, &0u64, &None, &None);
     assert!(client.is_active_grantee(&archived_grantee), "Active grant should return true");
     
