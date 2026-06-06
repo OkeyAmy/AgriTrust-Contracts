@@ -12,7 +12,8 @@ fn test_matching_pool_full_cycle_10_projects_100_donors() {
     env.mock_all_auths();
 
     let admin = Address::generate(&env);
-    let token = env.register_stellar_asset_contract_v2(admin.clone());
+    let token_contract = env.register_stellar_asset_contract_v2(admin.clone());
+    let token = token_contract.address();
     let token_admin = token::StellarAssetClient::new(&env, &token);
     let contract_id = env.register_contract(None, MatchingPoolContract);
     let client = MatchingPoolContractClient::new(&env, &contract_id);
@@ -147,7 +148,8 @@ fn test_quadratic_funding_incentives() {
     env.mock_all_auths();
 
     let admin = Address::generate(&env);
-    let token = env.register_stellar_asset_contract_v2(admin.clone());
+    let token_contract = env.register_stellar_asset_contract_v2(admin.clone());
+    let token = token_contract.address();
     let token_admin = token::StellarAssetClient::new(&env, &token);
     let contract_id = env.register_contract(None, MatchingPoolContract);
     let client = MatchingPoolContractClient::new(&env, &contract_id);
@@ -237,7 +239,8 @@ fn test_sep12_verification_prevents_unverified_donations() {
     env.mock_all_auths();
 
     let admin = Address::generate(&env);
-    let token = env.register_stellar_asset_contract_v2(admin.clone());
+    let token_contract = env.register_stellar_asset_contract_v2(admin.clone());
+    let token = token_contract.address();
     let token_admin = token::StellarAssetClient::new(&env, &token);
     let contract_id = env.register_contract(None, MatchingPoolContract);
     let client = MatchingPoolContractClient::new(&env, &contract_id);
@@ -320,7 +323,8 @@ fn test_incentive_mathematica_invariant() {
     env.mock_all_auths();
 
     let admin = Address::generate(&env);
-    let token = env.register_stellar_asset_contract_v2(admin.clone());
+    let token_contract = env.register_stellar_asset_contract_v2(admin.clone());
+    let token = token_contract.address();
     let token_admin = token::StellarAssetClient::new(&env, &token);
     let contract_id = env.register_contract(None, MatchingPoolContract);
     let client = MatchingPoolContractClient::new(&env, &contract_id);
