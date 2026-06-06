@@ -900,8 +900,19 @@ mod milestone_oracle_tests {
     fn milestone_reaches_consensus_at_two_of_three() {
         let env = Env::default();
         let contract_id = env.register_contract(None, crate::GrantStreamContract);
-        let (_admin, _recipient) = setup_grant(&env, &contract_id);
-        with_contract(&env, &contract_id, |env| {
+        let admin = Address::generate(&env);
+        let recipient = Address::generate(&env);
+        env.as_contract(&contract_id, || {
+            GrantContract::initialize(env.clone(), admin.clone()).unwrap();
+            GrantContract::create_grant(
+                env.clone(),
+                7,
+                recipient.clone(),
+                1_000_000,
+                100,
+                STATUS_ACTIVE | STATUS_MILESTONE_BASED,
+            )
+            .unwrap();
 
             let key1 = signing_key(1);
             let key2 = signing_key(2);
@@ -974,8 +985,19 @@ mod milestone_oracle_tests {
     fn duplicate_oracle_approval_is_rejected() {
         let env = Env::default();
         let contract_id = env.register_contract(None, crate::GrantStreamContract);
-        let (_admin, _recipient) = setup_grant(&env, &contract_id);
-        with_contract(&env, &contract_id, |env| {
+        let admin = Address::generate(&env);
+        let recipient = Address::generate(&env);
+        env.as_contract(&contract_id, || {
+            GrantContract::initialize(env.clone(), admin.clone()).unwrap();
+            GrantContract::create_grant(
+                env.clone(),
+                7,
+                recipient.clone(),
+                1_000_000,
+                100,
+                STATUS_ACTIVE | STATUS_MILESTONE_BASED,
+            )
+            .unwrap();
 
             let key1 = signing_key(11);
             let key2 = signing_key(12);
@@ -1017,8 +1039,19 @@ mod milestone_oracle_tests {
     fn milestone_stays_locked_after_dispute_window() {
         let env = Env::default();
         let contract_id = env.register_contract(None, crate::GrantStreamContract);
-        let (_admin, _recipient) = setup_grant(&env, &contract_id);
-        with_contract(&env, &contract_id, |env| {
+        let admin = Address::generate(&env);
+        let recipient = Address::generate(&env);
+        env.as_contract(&contract_id, || {
+            GrantContract::initialize(env.clone(), admin.clone()).unwrap();
+            GrantContract::create_grant(
+                env.clone(),
+                7,
+                recipient.clone(),
+                1_000_000,
+                100,
+                STATUS_ACTIVE | STATUS_MILESTONE_BASED,
+            )
+            .unwrap();
 
             let key1 = signing_key(21);
             let key2 = signing_key(22);
