@@ -189,7 +189,10 @@ fn test_get_health_factor_is_read_only_preview() {
     let recipient = Address::generate(&env);
 
     client.create_grant(&grant_id, &recipient, &100_000i128, &1_000i128, &0u64, &None, &None);
-    env.storage().instance().set(&super::storage_keys::StorageKey::ReserveBalance, &100_000i128);
+    let contract_id = client.address;
+    env.as_contract(&contract_id, || {
+        env.storage().instance().set(&super::storage_keys::StorageKey::ReserveBalance, &100_000i128);
+    });
 
     let health = client.get_health_factor();
     assert_eq!(health, 9000, "Health factor should reflect the current reserve and liabilities without mutating state");
